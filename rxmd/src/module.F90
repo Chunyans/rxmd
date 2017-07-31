@@ -41,6 +41,29 @@ end type mpi_var_type
 
 contains
 
+subroutine get_rank_and_size(mpt, comm)
+   implicit none
+   type(mpi_var_type),intent(inout) :: mpt 
+   integer,intent(in) :: comm
+
+   mpt%mycomm = comm
+   call MPI_COMM_RANK(mpt%mycomm, mpt%myid, mpt%ierr)
+   call MPI_COMM_SIZE(mpt%mycomm, mpt%nprocs, mpt%ierr)
+
+end subroutine
+
+subroutine copy_mpi_var_type(src,dest)
+   implicit none
+
+   type(mpi_var_type),intent(in) :: src
+   type(mpi_var_type),intent(inout) :: dest
+
+   dest%mycomm = src%mycomm
+   dest%myid = src%myid
+   dest%nprocs = src%nprocs
+  
+end subroutine
+
 subroutine GetMPIVariables(mpt)
    implicit none
 

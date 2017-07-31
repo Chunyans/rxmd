@@ -4,7 +4,7 @@ $(EXE): $(OBJS)
 	$(FC) -o $(EXE) $(LDFLAGS) $(OBJS) module.o
 	mv $(EXE) ../$(EXE)
 
-main.F90 : module.o bo.o pot.o support.o init.o cg.o
+main.F90 : module.o bo.o pot.o support.o init.o cg.o multitask.o
 
 bo.o : module.o
 fileio.o : module.o bo.o qeq_vars.o support.o
@@ -17,6 +17,7 @@ comm.o : module.o support.o qeq_vars.o
 module.o : memory.o
 list.o : module.o param.o support.o
 support.o : module.o param.o 
+multitask.o : comm.o
 
 
 clean:

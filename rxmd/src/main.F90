@@ -2,7 +2,7 @@
 program rxmd
 use atom_vars; use bo; use md_context; use rxmd_params; use cmdline_args; use mpi_vars
 use ff_params; use energy_terms; use support_funcs; use comms; use fileio_funcs
-use init_funcs; use qeq_vars; use qeq_funcs; use cg
+use init_funcs; use qeq_vars; use qeq_funcs; use cg; use multitask_funcs
 !------------------------------------------------------------------------------
 implicit none
 integer :: i,it1,it2,irt,provided, nstep, ierr
@@ -17,13 +17,18 @@ type(cmdline_arg_type) :: cla
 type(mpi_var_type) :: mpt
 type(bo_var_type) :: bos
 
+type(multitask_var_type) :: mtt
+
 call GetCmdLineArgs(cla)
 
-call GetMPIVariables(mpt)
-
-call initialize_md_context(mcx)
+call MPI_Init(ierr)
+call get_rank_and_size(mpt, MPI_COMM_WORLD)
 
 if(mpt%myid==0)  print'(a30)', 'rxmd has started'
+
+call initialize_multitask(mpt, mtt, NUMTASKS)
+
+call initialize_md_context(mcx)
 
 !--- read ffield file
 CALL GETPARAMS(ffp, cla%FFPath, mcx%FFDescript)
@@ -32,6 +37,8 @@ CALL GETPARAMS(ffp, cla%FFPath, mcx%FFDescript)
 CALL INITSYSTEM(mcx, ffp, avs, qvt, bos, rxp, cla, mpt)
 
 if(rxp%mdmode==10) call ConjugateGradient(ffp, avs, mcx, rxp, avs%atype, avs%pos, cla, mpt, rxp%ftol)
+
+call copy_mpi_var_type(mtt%task,mpt)
 
 call QEq(ffp, avs, qvt, mpt, rxp, mcx)
 call FORCE(ffp, mpt, bos, avs, qvt, mcx)
