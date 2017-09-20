@@ -9,7 +9,7 @@ main.F90 : module.o bo.o pot.o support.o init.o cg.o multitask.o
 bo.o : module.o
 fileio.o : module.o bo.o qeq_vars.o support.o
 init.o : module.o param.o pot.o qeq_vars.o qeq.o
-pot.o : module.o param.o qeq_vars.o qeq.o bo.o memory.o support.o list.o comm.o
+pot.o : module.o param.o qeq_vars.o qeq.o bo.o memory.o support.o list.o comm.o multitask.o
 qeq.o : module.o list.o comm.o qeq_vars.o
 stress.o : module.o comm.o
 cg.o : module.o pot.o qeq_vars.o qeq.o fileio.o

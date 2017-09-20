@@ -14,7 +14,7 @@ type(atom_var_type) :: avs
 type(qeq_var_type) :: qvt
 type(rxmd_param_type) :: rxp
 type(cmdline_arg_type) :: cla
-type(mpi_var_type) :: mpt
+type(mpi_var_type) :: mpt, mptGlobal
 type(bo_var_type) :: bos
 
 type(multitask_var_type) :: mtt
@@ -33,15 +33,23 @@ call initialize_md_context(mcx)
 !--- read ffield file
 CALL GETPARAMS(ffp, cla%FFPath, mcx%FFDescript)
 
+!--- FIXME
+!--- here overrite the global communicator by the task communictor but keep the global comm.
+call copy_mpi_var_type(mpt,mptGlobal)
+call copy_mpi_var_type(mtt%task,mpt)
+
 !--- initialize the MD system
 CALL INITSYSTEM(mcx, ffp, avs, qvt, bos, rxp, cla, mpt)
 
 if(rxp%mdmode==10) call ConjugateGradient(ffp, avs, mcx, rxp, avs%atype, avs%pos, cla, mpt, rxp%ftol)
 
-call copy_mpi_var_type(mtt%task,mpt)
-
-call QEq(ffp, avs, qvt, mpt, rxp, mcx)
-call FORCE(ffp, mpt, bos, avs, qvt, mcx)
+if(mtt%taskId==0) &
+  call QEq(ffp, avs, qvt, mpt, rxp, mcx)
+call FORCE(ffp, mpt, bos, avs, qvt, mcx, mtt%taskId)
+call MPI_ALLREDUCE(MPI_IN_PLACE, avs%f, size(avs%f), &
+     MPI_DOUBLE_PRECISION, MPI_SUM, mptGlobal%mycomm, mpt%ierr)
+call MPI_ALLREDUCE(MPI_IN_PLACE, mcx%PE, size(mcx%PE), &
+     MPI_DOUBLE_PRECISION, MPI_SUM, mptGlobal%mycomm, mpt%ierr)
 
 !--- Enter Main MD loop 
 call system_clock(it1,irt)
@@ -51,7 +59,7 @@ do nstep=0, rxp%ntime_step-1
 !--- FIXME: user-defined type var cannot be used as a loop counter. update time of md context here. 
    mcx%nstep=nstep
 
-   if(mod(nstep, rxp%pstep)==0) then
+   if(mtt%taskId==0 .and. mod(nstep, rxp%pstep)==0) then
        call PRINTE(mcx, mpt, rxp%pstep, avs%atype, avs%v, avs%q)
    endif
 
@@ -86,8 +94,12 @@ do nstep=0, rxp%ntime_step-1
 !--- migrate atoms after positions are updated
    call COPYATOMS(mcx, avs, qvt, mpt, MODE_MOVE, [0.d0, 0.d0, 0.d0])
    
-   if(mod(nstep,rxp%qstep)==0) call QEq(ffp, avs, qvt, mpt, rxp, mcx)
-   call FORCE(ffp, mpt, bos, avs, qvt, mcx)
+   if(mtt%taskId==0 .and. mod(nstep,rxp%qstep)==0) call QEq(ffp, avs, qvt, mpt, rxp, mcx)
+   call FORCE(ffp, mpt, bos, avs, qvt, mcx, mtt%taskId)
+   call MPI_ALLREDUCE(MPI_IN_PLACE, avs%f, size(avs%f), &
+        MPI_DOUBLE_PRECISION, MPI_SUM, mptGlobal%mycomm, mpt%ierr)
+   call MPI_ALLREDUCE(MPI_IN_PLACE, mcx%PE, size(mcx%PE), &
+        MPI_DOUBLE_PRECISION, MPI_SUM, mptGlobal%mycomm, mpt%ierr)
 
 !--- update velocity
    call vkick(mcx, 1.d0, avs%atype, avs%v, avs%f) 
@@ -109,7 +121,11 @@ if(rxp%isBinary) call WriteBIN(mcx, avs, qvt, rxp, mpt, GetFileNameBase(cla%data
 call system_clock(it2,irt)
 mcx%it_timer(Ntimer)=(it2-it1)
 
-call FinalizeMD(mcx, mpt, irt)
+do i=0, NUMTASKS-1
+   if(i==mtt%taskId) &
+   call FinalizeMD(mcx, mpt, irt)
+   call MPI_Barrier(mptGlobal%mycomm, mpt%ierr)
+enddo
 
 call MPI_FINALIZE(ierr)
 end PROGRAM

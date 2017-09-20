@@ -31,9 +31,9 @@ call allocatord1d(dDlp,1,NBUFFER)
 end subroutine
 
 !----------------------------------------------------------------------------------------------------------------------
-subroutine FORCE(ffp, mpt, bos, avs, qvt, mcx)
+subroutine FORCE(ffp, mpt, bos, avs, qvt, mcx, taskId)
 use atom_vars; use qeq_vars; use mpi_vars; use ff_params; use md_context; use bo
-use support_funcs; use list_funcs; use comms
+use support_funcs; use list_funcs; use comms; use multitask_funcs
 !----------------------------------------------------------------------------------------------------------------------
 implicit none
 
@@ -43,6 +43,9 @@ type(bo_var_type),intent(inout) :: bos
 type(atom_var_type),intent(inout) :: avs 
 type(qeq_var_type),intent(inout) :: qvt
 type(md_context_type),intent(inout) :: mcx
+!!FIXME mtt is optional here to avoid updating the FORCE() everywhere in the CG subroutine. 
+!!CG should be updated after making sure multitasking works, but not at this time. 
+integer,intent(in),optional :: taskId
 
 integer :: i, j, k
 real(8) :: dr(3)
@@ -73,17 +76,22 @@ do i=1, mcx%NBUFFER
    gtype(i)=l2g(avs%atype(i))
 enddo
 
+if(taskId==0) then
+!$omp parallel default(shared)
+CALL ENbond(mcx, ffp, avs%atype, avs%pos, avs%q, avs%f, mcx%PE)
+!$omp end parallel 
+else
 !$omp parallel default(shared)
 CALL BOCALC(bos, ffp, NMINCELL, avs%atype, avs%pos, mcx, mcx%copyptr(6))
 !$omp end parallel
 !$omp parallel default(shared)
-CALL ENbond(mcx, ffp, avs%atype, avs%pos, avs%q, avs%f, mcx%PE)
 CALL Ebond(mcx, ffp, bos, avs%atype, avs%pos, avs%f, mcx%PE)
 CALL Elnpr(mcx, ffp, bos, avs%atype, avs%pos, avs%f, mcx%PE)
 CALL Ehb(mcx, ffp, bos, avs%atype, avs%pos, avs%f, mcx%PE)
 CALL E3b(mcx, ffp, bos, avs%atype, avs%pos, avs%f, mcx%PE)
 CALL E4b(mcx, ffp, bos, avs%atype, avs%pos, avs%f, mcx%PE)
 !$omp end parallel 
+endif
 
 CALL ForceBondedTerms(NMINCELL, mcx, bos, avs%pos, avs%f)
 

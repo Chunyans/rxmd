@@ -1,7 +1,7 @@
 module multitask_funcs
 use mpi_vars
 
-integer,parameter :: NUMTASKS=1
+integer,parameter :: NUMTASKS=2
 
 type multitask_var_type
    integer :: taskId = 0
