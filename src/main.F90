@@ -47,9 +47,9 @@ if(mtt%taskId==0) &
   call QEq(ffp, avs, qvt, mpt, rxp, mcx)
 call FORCE(ffp, mpt, bos, avs, qvt, mcx, mtt%taskId)
 call MPI_ALLREDUCE(MPI_IN_PLACE, avs%f, size(avs%f), &
-     MPI_DOUBLE_PRECISION, MPI_SUM, mptGlobal%mycomm, mpt%ierr)
+     MPI_DOUBLE_PRECISION, MPI_SUM, mtt%team%mycomm, mpt%ierr)
 call MPI_ALLREDUCE(MPI_IN_PLACE, mcx%PE, size(mcx%PE), &
-     MPI_DOUBLE_PRECISION, MPI_SUM, mptGlobal%mycomm, mpt%ierr)
+     MPI_DOUBLE_PRECISION, MPI_SUM, mtt%team%mycomm, mpt%ierr)
 
 !--- Enter Main MD loop 
 call system_clock(it1,irt)
@@ -97,9 +97,9 @@ do nstep=0, rxp%ntime_step-1
    if(mtt%taskId==0 .and. mod(nstep,rxp%qstep)==0) call QEq(ffp, avs, qvt, mpt, rxp, mcx)
    call FORCE(ffp, mpt, bos, avs, qvt, mcx, mtt%taskId)
    call MPI_ALLREDUCE(MPI_IN_PLACE, avs%f, size(avs%f), &
-        MPI_DOUBLE_PRECISION, MPI_SUM, mptGlobal%mycomm, mpt%ierr)
+        MPI_DOUBLE_PRECISION, MPI_SUM, mtt%team%mycomm, mpt%ierr)
    call MPI_ALLREDUCE(MPI_IN_PLACE, mcx%PE, size(mcx%PE), &
-        MPI_DOUBLE_PRECISION, MPI_SUM, mptGlobal%mycomm, mpt%ierr)
+        MPI_DOUBLE_PRECISION, MPI_SUM, mtt%team%mycomm, mpt%ierr)
 
 !--- update velocity
    call vkick(mcx, 1.d0, avs%atype, avs%v, avs%f) 
